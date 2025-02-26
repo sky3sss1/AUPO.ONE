@@ -11,6 +11,8 @@ public static class ServiceCollectionExtension
     {
         services.AddMediatR(cfg => cfg.RegisterServicesFromAssembly(typeof(VulnerabilityFirstTaskQuery).Assembly));
         services.AddScoped<IParser, Parser>();
+        services.AddScoped<IAggregator, Aggregator>();
+        services.AddScoped<IExcelChartExporter, ExcelChartExporter>();
         return services;
     }
 }

@@ -6,6 +6,7 @@ namespace Infrastructure.Services;
 
 public class Parser : IParser
 {
+    private int skipYears = 6;
     public List<Vulnerability> MapFromByte(byte[] byteArray)
     {
         using var stream = new MemoryStream(byteArray);
@@ -13,24 +14,21 @@ public class Parser : IParser
         var worksheet = workbook.Worksheet(1);
 
         var vulnerabilities = new List<Vulnerability>(100000);
-        var sixYearsAgo = DateTime.Now.AddYears(-6);
+        var sixYearsAgo = DateTime.Now.AddYears(-skipYears);
         var rows = worksheet.RowsUsed().Skip(1);
 
         foreach (var row in rows)
         {
             try
             {
-                var cells = row.Cells(0, 24).ToList();
-                DateTime parsedDate = DateTime.Now;
-                if (!cells[9]?.TryGetValue<DateTime>(out parsedDate) ?? true)
+                string GetCellValue(int index) => row.Cell(index + 1).GetValue<string>().Trim();
+
+                DateTime parsedDate;
+                if (!row.Cell(10).TryGetValue(out parsedDate))
                 {
-                    if (DateTime.TryParse(cells[9]?.GetString(), out var manualDate))
+                    if (!DateTime.TryParse(GetCellValue(9), out parsedDate))
                     {
-                        parsedDate = manualDate;
-                    }
-                    else
-                    {
-                        Console.WriteLine($"Ошибка даты в строке {row.RowNumber()} - {cells[9]?.GetString()}");
+                        Console.WriteLine($"Ошибка даты в строке {row.RowNumber()} - {GetCellValue(9)}");
                         continue;
                     }
                 }
@@ -41,32 +39,38 @@ public class Parser : IParser
                     continue;
                 }
 
+                if (parsedDate.Year == DateTime.Now.Year)
+                {
+                    Console.WriteLine($"Пропущена строка {row.RowNumber()} - 2025 ({parsedDate:yyyy-MM-dd})");
+                    continue;
+                }
+
                 var vulnerability = new Vulnerability(
-                    id: cells[0]?.GetString() ?? "",
-                    name: cells[1]?.GetString() ?? "",
-                    description: cells[2]?.GetString() ?? "",
-                    vendor: cells[3]?.GetString() ?? "",
-                    poName: cells[4]?.GetString() ?? "",
-                    version: cells[5]?.GetString() ?? "",
-                    type: cells[6]?.GetString() ?? "",
-                    oSName: cells[7]?.GetString() ?? "",
-                    @class: cells[8]?.GetString() ?? "",
+                    id: GetCellValue(0),
+                    name: GetCellValue(1),
+                    description: GetCellValue(2),
+                    vendor: GetCellValue(3),
+                    poName: GetCellValue(4),
+                    version: GetCellValue(5),
+                    type: GetCellValue(6),
+                    oSName: GetCellValue(7),
+                    @class: GetCellValue(8),
                     date: parsedDate,
-                    cVSS2: cells[10]?.GetString() ?? "",
-                    cVSS3: cells[11]?.GetString() ?? "",
-                    dangerousLevel: cells[12]?.GetString() ?? "",
-                    measures: cells[13]?.GetString() ?? "",
-                    status: cells[14]?.GetString() ?? "",
-                    exploit: cells[15]?.GetString() ?? "",
-                    information: cells[16]?.GetString() ?? "",
-                    source: cells[17]?.GetString() ?? "",
-                    anotherIdentities: cells[18]?.GetString() ?? "",
-                    anotherInfo: cells[19]?.GetString() ?? "",
-                    iBConnection: cells[20]?.TryGetValue<int>(out var ibConn) == true ? ibConn : 0,
-                    useWay: cells[21]?.GetString() ?? "",
-                    defenseWay: cells[22]?.GetString() ?? "",
-                    errorDescription: cells[23]?.GetString() ?? "",
-                    errorType: cells[24]?.GetString() ?? ""
+                    cVSS2: GetCellValue(10),
+                    cVSS3: GetCellValue(11),
+                    dangerousLevel: GetCellValue(12),
+                    measures: GetCellValue(13),
+                    status: GetCellValue(14),
+                    exploit: GetCellValue(15),
+                    information: GetCellValue(16),
+                    source: GetCellValue(17),
+                    anotherIdentities: GetCellValue(18),
+                    anotherInfo: GetCellValue(19),
+                    iBConnection: row.Cell(21).TryGetValue<int>(out var ibConn) ? ibConn : 0,
+                    useWay: GetCellValue(21),
+                    defenseWay: GetCellValue(22),
+                    errorDescription: GetCellValue(23),
+                    errorType: GetCellValue(24)
                 );
 
                 vulnerabilities.Add(vulnerability);
@@ -80,4 +84,5 @@ public class Parser : IParser
         Console.WriteLine($"Загружено {vulnerabilities.Count} уязвимостей.");
         return vulnerabilities;
     }
+
 }
